@@ -1,0 +1,3 @@
+[submodule "plugins/redmine_gitolite"]
+	path = plugins/redmine_gitolite
+	url = https://github.com/pibako/redmine-gitolite.git
