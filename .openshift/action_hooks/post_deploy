@@ -86,3 +86,31 @@ then
 	bundle exec rake redmine:plugins:assets RAILS_ENV=production
 	popd >/dev/null
 fi
+
+# Create SSH key if doesn't exist
+if [ ! -d ${OPENSHIFT_DATA_DIR}.ssh ]
+then
+	mkdir ${OPENSHIFT_DATA_DIR}.ssh
+fi
+
+if [ ! -f ${OPENSHIFT_DATA_DIR}.ssh/id_rsa ]
+then
+	ssh-keygen -t rsa -f ${OPENSHIFT_DATA_DIR}.ssh/id_rsa -P ""
+fi
+
+# Create git_ssh script if doesn't exist
+cat <<EOF > ${OPENSHIFT_DATA_DIR}.ssh/git_ssh
+#!/bin/sh
+ssh -i "\${OPENSHIFT_DATA_DIR}.ssh/id_rsa" -o "StrictHostKeyChecking no" "\$@"
+EOF
+
+chmod 0750 ${OPENSHIFT_DATA_DIR}.ssh/git_ssh
+
+# Export variable GIT_SSH in .bash_profile
+if egrep '^export GIT_SSH=' ${OPENSHIFT_DATA_DIR}.bash_profile >/dev/null
+then
+	sed -i 's/^export GIT_SSH=.*/export GIT_SSH=${OPENSHIFT_DATA_DIR}.ssh\/git_ssh/g' ${OPENSHIFT_DATA_DIR}.bash_profile
+else
+	echo                                                    >> ${OPENSHIFT_DATA_DIR}.bash_profile
+	echo 'export GIT_SSH=${OPENSHIFT_DATA_DIR}.ssh/git_ssh' >> ${OPENSHIFT_DATA_DIR}.bash_profile
+fi
