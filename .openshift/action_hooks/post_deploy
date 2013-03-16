@@ -2,3 +2,87 @@
 # This is a simple post deploy hook executed after your application
 # is deployed and started.  This script gets executed directly, so 
 # it could be python, php, ruby, etc.
+
+set -e
+
+if find ${OPENSHIFT_REPO_DIR}plugins -maxdepth 1 -type d | egrep -v '/plugins$' >/dev/null
+then
+	HAS_PLUGINS=1
+else
+	HAS_PLUGINS=0
+fi
+
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+bundle exec rake generate_secret_token
+popd >/dev/null
+
+if [ -z "${OPENSHIFT_MYSQL_DB_HOST}" ]
+then
+	echo 1>&2
+	echo "Could not find mysql database. Please run:" 1>&2
+	echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+	echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
+	echo 1>&2
+	exit 5
+fi
+
+qry="select * from ${OPENSHIFT_APP_NAME}.users;"
+
+if ! /usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} -e "${qry}" >/dev/null 2>&1
+then
+	echo
+	echo "Schema not found! Recreating redmine schema."
+	echo
+	/usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} <<MYEOF
+drop database if exists ${OPENSHIFT_APP_NAME};
+create database ${OPENSHIFT_APP_NAME} character set utf8;
+MYEOF
+
+	# Run db:migrate
+	pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+
+	if [ $HAS_PLUGINS -eq 1 ]
+	then
+		mkdir ${OPENSHIFT_DATA_DIR}plugins_$$
+		mv ${OPENSHIFT_REPO_DIR}plugins/* ${OPENSHIFT_DATA_DIR}plugins_$$
+	fi
+
+	bundle exec rake db:migrate RAILS_ENV=production
+	bundle exec rake redmine:load_default_data RAILS_ENV=production REDMINE_LANG='fr'
+
+	if [ $HAS_PLUGINS -eq 1 ]
+	then
+		mv ${OPENSHIFT_DATA_DIR}plugins_$$/* ${OPENSHIFT_REPO_DIR}plugins
+		rmdir ${OPENSHIFT_DATA_DIR}plugins_$$
+	fi
+
+	echo "done."
+	popd >/dev/null
+else
+	echo "Database found, skipping import."
+fi
+
+# Create and link 'files' directory
+if [ ! -d ${OPENSHIFT_DATA_DIR}redmine/files ]
+then
+	mkdir -p ${OPENSHIFT_DATA_DIR}redmine/files
+fi
+
+ln -s ${OPENSHIFT_DATA_DIR}redmine/files ${OPENSHIFT_REPO_DIR}files
+
+# Create and link 'plugin_assets' directory
+if [ ! -d ${OPENSHIFT_DATA_DIR}redmine/plugin_assets ]
+then
+	mkdir -p ${OPENSHIFT_DATA_DIR}redmine/plugin_assets
+fi
+
+ln -s ${OPENSHIFT_DATA_DIR}redmine/plugin_assets ${OPENSHIFT_REPO_DIR}public/plugin_assets
+
+# Run redmine:plugins_migrate and redmine:plugins:assets if there are some plugins in plugins directory
+if [ $HAS_PLUGINS -eq 1 ]
+then
+	pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+	bundle exec rake redmine:plugins:migrate RAILS_ENV=production
+	bundle exec rake redmine:plugins:assets RAILS_ENV=production
+	popd >/dev/null
+fi
