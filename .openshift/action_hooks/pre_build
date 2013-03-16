@@ -3,3 +3,13 @@
 # available.  Otherwise it will execute while your application is stopped
 # before the build step.  This script gets executed directly, so it
 # could be python, php, ruby, etc.
+
+if [ ! -d ${OPENSHIFT_HOMEDIR}ruby-1.9 ]
+then
+	echo 1>&2
+	echo "A ruby-1.9 cartridge is required. Please run:" 1>&2
+	echo "rhc app delete ${OPENSHIFT_APP_NAME} --confirm" 1>&2
+	echo "rhc app create ${OPENSHIFT_APP_NAME} ruby-1.9" 1>&2
+	echo "then push on the new application." 1>&2
+	exit 5
+fi
