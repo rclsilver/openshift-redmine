@@ -1,3 +1,6 @@
 [submodule "plugins/redmine_gitolite"]
 	path = plugins/redmine_gitolite
 	url = https://github.com/pibako/redmine-gitolite.git
+[submodule "plugins/redmine_lemonldap"]
+	path = plugins/redmine_lemonldap
+	url = https://github.com/rclsilver/redmine-lemonldap.git
