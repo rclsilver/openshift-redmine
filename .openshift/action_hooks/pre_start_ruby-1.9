@@ -17,3 +17,8 @@ if [ -f ${OPENSHIFT_DATA_DIR}.bash_profile ]
 then
 	source ${OPENSHIFT_DATA_DIR}.bash_profile
 fi
+
+if [ -f ${OPENSHIFT_DATA_DIR}.db_selection ]
+then
+	source ${OPENSHIFT_DATA_DIR}.db_selection
+fi

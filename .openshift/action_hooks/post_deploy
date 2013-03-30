@@ -5,6 +5,81 @@
 
 set -e
 
+####################
+# Common functions #
+####################
+function schema_exists() {
+	if [ ! -z "${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
+	then
+		pgsql_schema_exists
+		return $?
+	else
+		mysql_schema_exists
+		return $?
+	fi
+}
+
+function create_database() {
+	if [ ! -z "${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
+	then
+		pgsql_create_database
+		return $?
+	else
+		mysql_create_database
+		return $?
+	fi
+}
+
+
+###################
+# MySQL functions #
+###################
+function mysql_schema_exists() {
+	qry="select * from ${OPENSHIFT_APP_NAME}.users;"
+
+	if /usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} -e "${qry}" >/dev/null 2>&1
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+function mysql_create_database() {
+	/usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} <<MYEOF
+drop database if exists ${OPENSHIFT_APP_NAME};
+create database ${OPENSHIFT_APP_NAME} character set utf8;
+MYEOF
+	return $?
+}
+
+
+########################
+# PostgreSQL functions #
+########################
+function pgsql_schema_exists() {
+	qry="select * from public.users;"
+	PGPASSWORD=${OPENSHIFT_POSTGRESQL_DB_PASSWORD}
+
+	if /usr/bin/psql -h ${OPENSHIFT_POSTGRESQL_DB_HOST} -U ${OPENSHIFT_POSTGRESQL_DB_USERNAME} -d ${OPENSHIFT_APP_NAME} -c "${qry}" >/dev/null 2>&1
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+function pgsql_create_database() {
+	PGPASSWORD=${OPENSHIFT_POSTGRESQL_DB_PASSWORD}
+
+	if ! /usr/bin/psql -h ${OPENSHIFT_POSTGRESQL_DB_HOST} -U ${OPENSHIFT_POSTGRESQL_DB_USERNAME} -d ${OPENSHIFT_APP_NAME} -t -c "SELECT datname FROM pg_database WHERE datname = '${OPENSHIFT_APP_NAME}';" | egrep -v '^$' | sed 's/ //g' | egrep "^${OPENSHIFT_APP_NAME}\$"
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
 if find ${OPENSHIFT_REPO_DIR}plugins -maxdepth 1 -type d | egrep -v '/plugins$' >/dev/null
 then
 	HAS_PLUGINS=1
@@ -16,27 +91,54 @@ pushd ${OPENSHIFT_REPO_DIR} > /dev/null
 bundle exec rake generate_secret_token
 popd >/dev/null
 
-if [ -z "${OPENSHIFT_MYSQL_DB_HOST}" ]
+if [ -z "${OPENSHIFT_MYSQL_DB_HOST}" ] && [ -z "${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
 then
 	echo 1>&2
-	echo "Could not find mysql database. Please run:" 1>&2
+	echo "Could not find any database." 1>&2
+	echo "To install a MySQL database, please run:" 1>&2
 	echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+	echo "To install a PostgreSQL database, please run:" 1>&2
+	echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c postgresql-8.4" 1>&2
 	echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
 	echo 1>&2
 	exit 5
 fi
 
-qry="select * from ${OPENSHIFT_APP_NAME}.users;"
+# Create database selection script
+cat <<EOF >${OPENSHIFT_DATA_DIR}.db_selection
+if [ ! -z "\${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
+then
+    export REDMINE_DB_ADAPTER="postgresql"
+    export REDMINE_DB_HOST="\${OPENSHIFT_POSTGRESQL_DB_HOST}"
+    export REDMINE_DB_PORT="\${OPENSHIFT_POSTGRESQL_DB_PORT}"
+    export REDMINE_DB_USER="\${OPENSHIFT_POSTGRESQL_DB_USERNAME}"
+    export REDMINE_DB_PASS="\${OPENSHIFT_POSTGRESQL_DB_PASSWORD}"
+else
+    export REDMINE_DB_ADAPTER="mysql2"
+    export REDMINE_DB_HOST="\${OPENSHIFT_MYSQL_DB_HOST}"
+    export REDMINE_DB_PORT="\${OPENSHIFT_MYSQL_DB_PORT}"
+    export REDMINE_DB_USER="\${OPENSHIFT_MYSQL_DB_USERNAME}"
+    export REDMINE_DB_PASS="\${OPENSHIFT_MYSQL_DB_PASSWORD}"
+fi
 
-if ! /usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} -e "${qry}" >/dev/null 2>&1
+export REDMINE_DB_BASE="\${OPENSHIFT_APP_NAME}"
+EOF
+
+source ${OPENSHIFT_DATA_DIR}.db_selection
+
+if ! schema_exists
 then
 	echo
 	echo "Schema not found! Recreating redmine schema."
 	echo
-	/usr/bin/mysql -h ${OPENSHIFT_MYSQL_DB_HOST} -u ${OPENSHIFT_MYSQL_DB_USERNAME} --password=${OPENSHIFT_MYSQL_DB_PASSWORD} <<MYEOF
-drop database if exists ${OPENSHIFT_APP_NAME};
-create database ${OPENSHIFT_APP_NAME} character set utf8;
-MYEOF
+
+	if ! create_database
+	then
+		echo 1>&2
+		echo "Error occured while creating redmine database." 1>&2
+		echo 1>&2
+		exit 5
+	fi
 
 	# Run db:migrate
 	pushd ${OPENSHIFT_REPO_DIR} > /dev/null
