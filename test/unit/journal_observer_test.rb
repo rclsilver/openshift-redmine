@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,9 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class JournalObserverTest < ActiveSupport::TestCase
-  fixtures :issues, :issue_statuses, :journals, :journal_details
+  fixtures :issues, :issue_statuses, :journals, :journal_details, :projects,
+           :projects_trackers, :trackers, :enabled_modules, :enumerations,
+           :users, :roles
 
   def setup
     ActionMailer::Base.deliveries.clear
@@ -27,8 +29,8 @@ class JournalObserverTest < ActiveSupport::TestCase
 
   # context: issue_updated notified_events
   def test_create_should_send_email_notification_with_issue_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
 
     with_settings :notified_events => %w(issue_updated) do
@@ -38,8 +40,8 @@ class JournalObserverTest < ActiveSupport::TestCase
   end
 
   def test_create_should_not_send_email_notification_with_notify_set_to_false
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
     journal.notify = false
 
@@ -50,8 +52,8 @@ class JournalObserverTest < ActiveSupport::TestCase
   end
 
   def test_create_should_not_send_email_notification_without_issue_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
 
     with_settings :notified_events => [] do
@@ -62,8 +64,8 @@ class JournalObserverTest < ActiveSupport::TestCase
 
   # context: issue_note_added notified_events
   def test_create_should_send_email_notification_with_issue_note_added
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
     journal.notes = 'This update has a note'
 
@@ -74,8 +76,8 @@ class JournalObserverTest < ActiveSupport::TestCase
   end
 
   def test_create_should_not_send_email_notification_without_issue_note_added
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     journal = issue.init_journal(user, issue)
     journal.notes = 'This update has a note'
 
@@ -87,8 +89,8 @@ class JournalObserverTest < ActiveSupport::TestCase
 
   # context: issue_status_updated notified_events
   def test_create_should_send_email_notification_with_issue_status_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     issue.init_journal(user, issue)
     issue.status = IssueStatus.last
 
@@ -99,8 +101,8 @@ class JournalObserverTest < ActiveSupport::TestCase
   end
 
   def test_create_should_not_send_email_notification_without_issue_status_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     issue.init_journal(user, issue)
     issue.status = IssueStatus.last
 
@@ -112,8 +114,8 @@ class JournalObserverTest < ActiveSupport::TestCase
 
   # context: issue_priority_updated notified_events
   def test_create_should_send_email_notification_with_issue_priority_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     issue.init_journal(user, issue)
     issue.priority = IssuePriority.last
 
@@ -124,8 +126,8 @@ class JournalObserverTest < ActiveSupport::TestCase
   end
 
   def test_create_should_not_send_email_notification_without_issue_priority_updated
-    issue = Issue.find(:first)
-    user = User.find(:first)
+    issue = Issue.first
+    user = User.first
     issue.init_journal(user, issue)
     issue.priority = IssuePriority.last
 

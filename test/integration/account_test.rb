@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -45,7 +45,7 @@ class AccountTest < ActionController::IntegrationTest
     # User logs in with 'autologin' checked
     post '/login', :username => user.login, :password => 'admin', :autologin => 1
     assert_redirected_to '/my/page'
-    token = Token.find :first
+    token = Token.first
     assert_not_nil token
     assert_equal user, token.user
     assert_equal 'autologin', token.action
@@ -68,17 +68,45 @@ class AccountTest < ActionController::IntegrationTest
     assert_not_nil user.reload.last_login_on
   end
 
+  def test_autologin_should_use_autologin_cookie_name
+    Token.delete_all
+    Redmine::Configuration.stubs(:[]).with('autologin_cookie_name').returns('custom_autologin')
+    Redmine::Configuration.stubs(:[]).with('autologin_cookie_path').returns('/')
+    Redmine::Configuration.stubs(:[]).with('autologin_cookie_secure').returns(false)
+
+    with_settings :autologin => '7' do
+      assert_difference 'Token.count' do
+        post '/login', :username => 'admin', :password => 'admin', :autologin => 1
+      end
+      assert_response 302
+      assert cookies['custom_autologin'].present?
+      token = cookies['custom_autologin']
+  
+      # Session is cleared
+      reset!
+      cookies['custom_autologin'] = token
+      get '/my/page'
+      assert_response :success
+
+      assert_difference 'Token.count', -1 do
+        post '/logout'
+      end
+      assert cookies['custom_autologin'].blank?
+    end
+  end
+
   def test_lost_password
     Token.delete_all
 
     get "account/lost_password"
     assert_response :success
     assert_template "account/lost_password"
+    assert_select 'input[name=mail]'
 
     post "account/lost_password", :mail => 'jSmith@somenet.foo'
     assert_redirected_to "/login"
 
-    token = Token.find(:first)
+    token = Token.first
     assert_equal 'recovery', token.action
     assert_equal 'jsmith@somenet.foo', token.user.mail
     assert !token.expired?
@@ -86,12 +114,15 @@ class AccountTest < ActionController::IntegrationTest
     get "account/lost_password", :token => token.value
     assert_response :success
     assert_template "account/password_recovery"
+    assert_select 'input[type=hidden][name=token][value=?]', token.value
+    assert_select 'input[name=new_password]'
+    assert_select 'input[name=new_password_confirmation]'
 
-    post "account/lost_password", :token => token.value, :new_password => 'newpass', :new_password_confirmation => 'newpass'
+    post "account/lost_password", :token => token.value, :new_password => 'newpass123', :new_password_confirmation => 'newpass123'
     assert_redirected_to "/login"
     assert_equal 'Password was successfully updated.', flash[:notice]
 
-    log_user('jsmith', 'newpass')
+    log_user('jsmith', 'newpass123')
     assert_equal 0, Token.count
   end
 
@@ -103,7 +134,7 @@ class AccountTest < ActionController::IntegrationTest
     assert_template 'account/register'
 
     post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
-                             :password => "newpass", :password_confirmation => "newpass"}
+                             :password => "newpass123", :password_confirmation => "newpass123"}
     assert_redirected_to '/my/account'
     follow_redirect!
     assert_response :success
@@ -119,7 +150,7 @@ class AccountTest < ActionController::IntegrationTest
     Setting.self_registration = '2'
 
     post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
-                             :password => "newpass", :password_confirmation => "newpass"}
+                             :password => "newpass123", :password_confirmation => "newpass123"}
     assert_redirected_to '/login'
     assert !User.find_by_login('newuser').active?
   end
@@ -129,18 +160,18 @@ class AccountTest < ActionController::IntegrationTest
     Token.delete_all
 
     post 'account/register', :user => {:login => "newuser", :language => "en", :firstname => "New", :lastname => "User", :mail => "newuser@foo.bar",
-                             :password => "newpass", :password_confirmation => "newpass"}
+                             :password => "newpass123", :password_confirmation => "newpass123"}
     assert_redirected_to '/login'
     assert !User.find_by_login('newuser').active?
 
-    token = Token.find(:first)
+    token = Token.first
     assert_equal 'register', token.action
     assert_equal 'newuser@foo.bar', token.user.mail
     assert !token.expired?
 
     get 'account/activate', :token => token.value
     assert_redirected_to '/login'
-    log_user('newuser', 'newpass')
+    log_user('newuser', 'newpass123')
   end
 
   def test_onthefly_registration

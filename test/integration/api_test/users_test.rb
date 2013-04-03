@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,9 +16,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 require File.expand_path('../../../test_helper', __FILE__)
-require 'pp'
-class ApiTest::UsersTest < ActionController::IntegrationTest
-  fixtures :users
+
+class Redmine::ApiTest::UsersTest < Redmine::ApiTest::Base
+  fixtures :users, :members, :member_roles, :roles, :projects
 
   def setup
     Setting.rest_api_enabled = '1'
@@ -96,13 +96,37 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
     end
   end
 
+  test "GET /users/:id should not return login for other user" do
+    get '/users/3.xml', {}, credentials('jsmith')
+    assert_response :success
+    assert_no_tag 'user', :child => {:tag => 'login'}
+  end
+
+  test "GET /users/:id should return login for current user" do
+    get '/users/2.xml', {}, credentials('jsmith')
+    assert_response :success
+    assert_tag 'user', :child => {:tag => 'login', :content => 'jsmith'}
+  end
+
+  test "GET /users/:id should not return api_key for other user" do
+    get '/users/3.xml', {}, credentials('jsmith')
+    assert_response :success
+    assert_no_tag 'user', :child => {:tag => 'api_key'}
+  end
+
+  test "GET /users/:id should return api_key for current user" do
+    get '/users/2.xml', {}, credentials('jsmith')
+    assert_response :success
+    assert_tag 'user', :child => {:tag => 'api_key', :content => User.find(2).api_key}
+  end
+
   context "POST /users" do
     context "with valid parameters" do
       setup do
         @parameters = {
           :user => {
              :login => 'foo', :firstname => 'Firstname', :lastname => 'Lastname',
-             :mail => 'foo@example.net', :password => 'secret',
+             :mail => 'foo@example.net', :password => 'secret123',
              :mail_notification => 'only_assigned'
           }
         }
@@ -113,7 +137,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
           '/users.xml',
            {:user => {
               :login => 'foo', :firstname => 'Firstname', :lastname => 'Lastname',
-              :mail => 'foo@example.net', :password => 'secret'
+              :mail => 'foo@example.net', :password => 'secret123'
             }},
           {:success_code => :created})
 
@@ -129,7 +153,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
           assert_equal 'foo@example.net', user.mail
           assert_equal 'only_assigned', user.mail_notification
           assert !user.admin?
-          assert user.check_password?('secret')
+          assert user.check_password?('secret123')
 
           assert_response :created
           assert_equal 'application/xml', @response.content_type
@@ -238,6 +262,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
           assert !user.admin?
 
           assert_response :ok
+          assert_equal '', @response.body
         end
       end
 
@@ -263,6 +288,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
           assert !user.admin?
 
           assert_response :ok
+          assert_equal '', @response.body
         end
       end
     end
@@ -322,6 +348,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
         end
 
         assert_response :ok
+        assert_equal '', @response.body
       end
     end
 
@@ -337,6 +364,7 @@ class ApiTest::UsersTest < ActionController::IntegrationTest
         end
 
         assert_response :ok
+        assert_equal '', @response.body
       end
     end
   end

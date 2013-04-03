@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2012  Jean-Philippe Lang
+# Copyright (C) 2006-2013  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -105,6 +105,38 @@ class RepositoryTest < ActiveSupport::TestCase
     )
     assert r.save
   end
+  
+  def test_identifier_should_not_be_frozen_for_a_new_repository
+    assert_equal false, Repository.new.identifier_frozen?
+  end
+
+  def test_identifier_should_not_be_frozen_for_a_saved_repository_with_blank_identifier
+    Repository.update_all(["identifier = ''"], "id = 10")
+
+    assert_equal false, Repository.find(10).identifier_frozen?
+  end
+
+  def test_identifier_should_be_frozen_for_a_saved_repository_with_valid_identifier
+    Repository.update_all(["identifier = 'abc123'"], "id = 10")
+
+    assert_equal true, Repository.find(10).identifier_frozen?
+  end
+
+  def test_identifier_should_not_accept_change_if_frozen
+    r = Repository.new(:identifier => 'foo')
+    r.stubs(:identifier_frozen?).returns(true)
+
+    r.identifier = 'bar'
+    assert_equal 'foo', r.identifier
+  end
+
+  def test_identifier_should_accept_change_if_not_frozen
+    r = Repository.new(:identifier => 'foo')
+    r.stubs(:identifier_frozen?).returns(false)
+
+    r.identifier = 'bar'
+    assert_equal 'bar', r.identifier
+  end
 
   def test_destroy
     repository = Repository.find(10)
@@ -177,7 +209,7 @@ class RepositoryTest < ActiveSupport::TestCase
     assert_equal [101], fixed_issue.changeset_ids
 
     # issue change
-    journal = fixed_issue.journals.find(:first, :order => 'created_on desc')
+    journal = fixed_issue.journals.reorder('created_on desc').first
     assert_equal User.find_by_login('dlopper'), journal.user
     assert_equal 'Applied in changeset r2.', journal.notes
 
