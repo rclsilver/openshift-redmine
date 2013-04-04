@@ -139,30 +139,31 @@ then
 		echo 1>&2
 		exit 5
 	fi
-
-	# Run db:migrate
-	pushd ${OPENSHIFT_REPO_DIR} > /dev/null
-
-	if [ $HAS_PLUGINS -eq 1 ]
-	then
-		mkdir ${OPENSHIFT_DATA_DIR}plugins_$$
-		mv ${OPENSHIFT_REPO_DIR}plugins/* ${OPENSHIFT_DATA_DIR}plugins_$$
-	fi
-
-	bundle exec rake db:migrate RAILS_ENV=production
-	bundle exec rake redmine:load_default_data RAILS_ENV=production REDMINE_LANG='fr'
-
-	if [ $HAS_PLUGINS -eq 1 ]
-	then
-		mv ${OPENSHIFT_DATA_DIR}plugins_$$/* ${OPENSHIFT_REPO_DIR}plugins
-		rmdir ${OPENSHIFT_DATA_DIR}plugins_$$
-	fi
-
-	echo "done."
-	popd >/dev/null
 else
-	echo "Database found, skipping import."
+	echo "Schema found!"
 fi
+
+# Run db:migrate
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+
+if [ $HAS_PLUGINS -eq 1 ]
+then
+	mkdir ${OPENSHIFT_DATA_DIR}plugins_$$
+	mv ${OPENSHIFT_REPO_DIR}plugins/* ${OPENSHIFT_DATA_DIR}plugins_$$
+fi
+
+bundle exec rake db:migrate RAILS_ENV=production
+bundle exec rake redmine:load_default_data RAILS_ENV=production REDMINE_LANG='fr'
+
+if [ $HAS_PLUGINS -eq 1 ]
+then
+	mv ${OPENSHIFT_DATA_DIR}plugins_$$/* ${OPENSHIFT_REPO_DIR}plugins
+	rmdir ${OPENSHIFT_DATA_DIR}plugins_$$
+fi
+
+echo "done."
+popd >/dev/null
+
 
 # Create and link 'files' directory
 if [ ! -d ${OPENSHIFT_DATA_DIR}redmine/files ]
