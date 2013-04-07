@@ -25,6 +25,7 @@
 /tmp/thumbnails/*
 /vendor/cache
 /vendor/rails
+/vendor/bundle
 *.rbc
 
 /.bundle
