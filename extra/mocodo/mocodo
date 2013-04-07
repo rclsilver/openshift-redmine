@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+PROGRAM=$(readlink -f $0)
+MY_DIR=$(dirname ${PROGRAM})
+TMP_DIR="${OPENSHIFT_TMP_DIR:-/tmp/}$$"
+
+mkdir -p ${TMP_DIR}
+pushd ${TMP_DIR} >/dev/null
+
+while read line
+do
+	echo "$line" >> input.mcd
+done
+
+${MY_DIR}/mocodo.py --input=input.mcd --output=svg ${@} >/dev/null
+cat input.svg
+
+popd >/dev/null
+
+rm -rf "${TMP_DIR}"

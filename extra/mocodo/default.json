@@ -1,0 +1,19 @@
+{
+    "attraction": 40, 
+    "colors": "bw", 
+    "df": "DF", 
+    "encodings": [
+        "utf8", 
+        "ISO_8859-15"
+    ], 
+    "extract": false, 
+    "input": "sandbox.mcd", 
+    "output": "svg", 
+    "sep": ",", 
+    "shapes": "serif", 
+    "tables": [
+        "html", 
+        "txt"
+    ], 
+    "tkinter": false
+}
