@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/bin/java -Djava.io.tmpdir=${OPENSHIFT_TMP_DIR:-/tmp} -jar $(dirname $0)/plantuml.jar ${@}
