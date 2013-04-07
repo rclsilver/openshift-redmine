@@ -217,3 +217,17 @@ else
 	echo                                                    >> ${OPENSHIFT_DATA_DIR}.bash_profile
 	echo 'export GIT_SSH=${OPENSHIFT_DATA_DIR}.ssh/git_ssh' >> ${OPENSHIFT_DATA_DIR}.bash_profile
 fi
+
+# Deployment of PlantUML
+if [ -d ${OPENSHIFT_DATA_DIR}plantuml ]
+then
+	rm -rf ${OPENSHIFT_DATA_DIR}plantuml
+fi
+mv ${OPENSHIFT_REPO_DIR}extra/plantuml ${OPENSHIFT_DATA_DIR}
+
+# Deployment of MoCoDo
+if [ -d ${OPENSHIFT_DATA_DIR}mocodo ]
+then
+	rm -rf ${OPENSHIFT_DATA_DIR}mocodo
+fi
+mv ${OPENSHIFT_REPO_DIR}extra/mocodo ${OPENSHIFT_DATA_DIR}
