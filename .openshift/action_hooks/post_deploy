@@ -91,41 +91,6 @@ pushd ${OPENSHIFT_REPO_DIR} > /dev/null
 bundle exec rake generate_secret_token
 popd >/dev/null
 
-if [ -z "${OPENSHIFT_MYSQL_DB_HOST}" ] && [ -z "${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
-then
-	echo 1>&2
-	echo "Could not find any database." 1>&2
-	echo "To install a MySQL database, please run:" 1>&2
-	echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
-	echo "To install a PostgreSQL database, please run:" 1>&2
-	echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c postgresql-8.4" 1>&2
-	echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
-	echo 1>&2
-	exit 5
-fi
-
-# Create database selection script
-cat <<EOF >${OPENSHIFT_DATA_DIR}.db_selection
-if [ ! -z "\${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
-then
-    export REDMINE_DB_ADAPTER="postgresql"
-    export REDMINE_DB_HOST="\${OPENSHIFT_POSTGRESQL_DB_HOST}"
-    export REDMINE_DB_PORT="\${OPENSHIFT_POSTGRESQL_DB_PORT}"
-    export REDMINE_DB_USER="\${OPENSHIFT_POSTGRESQL_DB_USERNAME}"
-    export REDMINE_DB_PASS="\${OPENSHIFT_POSTGRESQL_DB_PASSWORD}"
-else
-    export REDMINE_DB_ADAPTER="mysql2"
-    export REDMINE_DB_HOST="\${OPENSHIFT_MYSQL_DB_HOST}"
-    export REDMINE_DB_PORT="\${OPENSHIFT_MYSQL_DB_PORT}"
-    export REDMINE_DB_USER="\${OPENSHIFT_MYSQL_DB_USERNAME}"
-    export REDMINE_DB_PASS="\${OPENSHIFT_MYSQL_DB_PASSWORD}"
-fi
-
-export REDMINE_DB_BASE="\${OPENSHIFT_APP_NAME}"
-EOF
-
-source ${OPENSHIFT_DATA_DIR}.db_selection
-
 if ! schema_exists
 then
 	echo

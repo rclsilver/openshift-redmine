@@ -4,7 +4,8 @@
 # before the build step.  This script gets executed directly, so it
 # could be python, php, ruby, etc.
 
-if [ ! -d ${OPENSHIFT_HOMEDIR}ruby-1.9 ]
+# Check the application uses a Ruby-1.9 cartridge
+if [ "1.9" != "${OPENSHIFT_RUBY_VERSION}" ]
 then
 	echo 1>&2
 	echo "A ruby-1.9 cartridge is required. Please run:" 1>&2
@@ -12,4 +13,42 @@ then
 	echo "rhc app create ${OPENSHIFT_APP_NAME} ruby-1.9" 1>&2
 	echo "then push on the new application." 1>&2
 	exit 5
+fi
+
+# Check if either MySQL or PostgreSQL is installed
+if [ -z "${OPENSHIFT_MYSQL_DB_HOST}" ] && [ -z "${OPENSHIFT_POSTGRESQL_DB_HOST}" ]
+then
+    echo 1>&2
+    echo "Could not find any database." 1>&2
+    echo "To install a MySQL database, please run:" 1>&2
+    echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+    echo "To install a PostgreSQL database, please run:" 1>&2
+    echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c postgresql-8.4" 1>&2
+    echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
+    echo 1>&2
+    exit 5
+fi
+
+# Create database configuration
+if [ ! -z "$OPENSHIFT_POSTGRESQL_DB_HOST" ]
+then
+    cat <<EOF> ${OPENSHIFT_REPO_DIR}config/database.yml
+production:
+  adapter:  'postgresql'
+  database: <%= ENV['OPENSHIFT_APP_NAME'] %>
+  host:     <%= ENV['OPENSHIFT_POSTGRESQL_DB_HOST'] %>
+  username: <%= ENV['OPENSHIFT_POSTGRESQL_DB_USERNAME'] %>
+  password: <%= ENV['OPENSHIFT_POSTGRESQL_DB_PASSWORD'] %>
+  encoding: utf8
+EOF
+else
+    cat <<EOF> ${OPENSHIFT_REPO_DIR}config/database.yml
+production:
+  adapter:  'mysql2'
+  database: <%= ENV['OPENSHIFT_APP_NAME'] %>
+  host:     <%= ENV['OPENSHIFT_MYSQL_DB_HOST'] %>
+  username: <%= ENV['OPENSHIFT_MYSQL_DB_USERNAME'] %>
+  password: <%= ENV['OPENSHIFT_MYSQL_DB_PASSWORD'] %>
+  encoding: utf8
+EOF
 fi
